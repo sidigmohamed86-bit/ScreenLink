@@ -66,10 +66,28 @@ function createPeer() {
   };
 
   peer.ontrack = e => {
-    remoteVideo.srcObject = e.streams[0];
+    let stream = e.streams && e.streams[0];
+
+    if (!stream) {
+      if (!remoteVideo.srcObject) {
+        remoteVideo.srcObject = new MediaStream();
+      }
+      remoteVideo.srcObject.addTrack(e.track);
+      stream = remoteVideo.srcObject;
+    } else {
+      remoteVideo.srcObject = stream;
+    }
+
     placeholder.classList.add("hidden");
     remoteStatus.textContent = "Live";
-    remoteVideo.play().catch(()=>{});
+
+    remoteVideo.onloadedmetadata = () => {
+      remoteVideo.play().catch(() => {
+        message("Tap the video to start playback.");
+      });
+    };
+
+    remoteVideo.play().catch(() => {});
   };
 
   peer.onconnectionstatechange = () => {
@@ -204,32 +222,47 @@ socket.on("peer-joined", () => {
   }
 });
 
-socket.on("offer", async ({offer}) => {
+socket.on("offer", async (offer) => {
   if (isHost) return;
 
-  createPeer();
-  await peer.setRemoteDescription(offer);
-  remoteDescriptionSet = true;
-  await addPendingCandidates();
+  try {
+    createPeer();
+    await peer.setRemoteDescription(offer);
+    remoteDescriptionSet = true;
+    await addPendingCandidates();
 
-  const answer = await peer.createAnswer();
-  await peer.setLocalDescription(answer);
-  socket.emit("answer", { room: roomCode, answer: peer.localDescription });
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    socket.emit("answer", { room: roomCode, answer: peer.localDescription });
+  } catch (e) {
+    console.error("Offer error:", e);
+    message("Could not connect to the host.");
+  }
 });
 
-socket.on("answer", async ({answer}) => {
+socket.on("answer", async (answer) => {
   if (!peer) return;
-  await peer.setRemoteDescription(answer);
-  remoteDescriptionSet = true;
-  await addPendingCandidates();
+
+  try {
+    await peer.setRemoteDescription(answer);
+    remoteDescriptionSet = true;
+    await addPendingCandidates();
+  } catch (e) {
+    console.error("Answer error:", e);
+  }
 });
 
-socket.on("ice-candidate", async ({candidate}) => {
+socket.on("ice-candidate", async (candidate) => {
   if (!peer || !peer.remoteDescription) {
     pendingCandidates.push(candidate);
     return;
   }
-  try { await peer.addIceCandidate(candidate); } catch(e) {}
+
+  try {
+    await peer.addIceCandidate(candidate);
+  } catch(e) {
+    console.error("ICE candidate error:", e);
+  }
 });
 
 socket.on("share-stopped", () => {
