@@ -5,90 +5,134 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
-  cors: { origin: true, credentials: false }
+  cors: {
+    origin: true,
+    credentials: false
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 
 app.disable("x-powered-by");
+
+// Website files are in the repository root
 app.use(express.static(__dirname));
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, service: "ScreenLink" });
+  res.json({
+    ok: true,
+    service: "ScreenLink"
+  });
 });
 
-app.use((req, res) => {
-  
-res.sendFile(path.join(__dirname, "index.html"));
+io.on("connection", (socket) => {
+  socket.on("create-room", ({ room }) => {
+    if (!room) return;
 
-function validRoom(room) {
-  return typeof room === "string" && /^[A-Z0-9]{6}$/.test(room);
-}
+    if (rooms.has(room)) {
+      socket.emit("room-error", "Room already exists.");
+      return;
+    }
 
-io.on("connection", socket => {
-  socket.on("create-room", ({room}) => {
-    if (!validRoom(room)) return socket.emit("error-message", {message:"Invalid room code."});
-    if (rooms.has(room)) return socket.emit("error-message", {message:"That room already exists. Try again."});
+    rooms.set(room, {
+      host: socket.id,
+      viewer: null
+    });
 
-    rooms.set(room, {host: socket.id, viewer: null});
     socket.join(room);
     socket.data.room = room;
     socket.data.role = "host";
-    socket.emit("room-created", {room});
+
+    socket.emit("room-created", room);
   });
 
-  socket.on("join-room", ({room}) => {
-    if (!validRoom(room)) return socket.emit("error-message", {message:"Invalid room code."});
-    const r = rooms.get(room);
-    if (!r) return socket.emit("error-message", {message:"Room not found."});
-    if (r.viewer && r.viewer !== socket.id) return socket.emit("error-message", {message:"Room is already in use."});
+  socket.on("join-room", ({ room }) => {
+    const data = rooms.get(room);
 
-    r.viewer = socket.id;
+    if (!data) {
+      socket.emit("room-error", "Room not found.");
+      return;
+    }
+
+    if (data.viewer) {
+      socket.emit("room-error", "Room already has a viewer.");
+      return;
+    }
+
+    data.viewer = socket.id;
+
     socket.join(room);
     socket.data.room = room;
     socket.data.role = "viewer";
 
-    socket.emit("joined", {room});
-    io.to(r.host).emit("peer-joined");
+    io.to(data.host).emit("peer-joined");
+    socket.emit("joined-room", room);
   });
 
-  socket.on("offer", ({room, offer}) => {
-    const r = rooms.get(room);
-    if (r?.viewer) io.to(r.viewer).emit("offer", {offer});
+  socket.on("offer", ({ room, offer }) => {
+    const data = rooms.get(room);
+
+    if (!data || !data.viewer) return;
+
+    io.to(data.viewer).emit("offer", offer);
   });
 
-  socket.on("answer", ({room, answer}) => {
-    const r = rooms.get(room);
-    if (r?.host) io.to(r.host).emit("answer", {answer});
+  socket.on("answer", ({ room, answer }) => {
+    const data = rooms.get(room);
+
+    if (!data || !data.host) return;
+
+    io.to(data.host).emit("answer", answer);
   });
 
-  socket.on("ice-candidate", ({room, candidate}) => {
-    const r = rooms.get(room);
-    if (!r) return;
-    const target = socket.id === r.host ? r.viewer : r.host;
-    if (target) io.to(target).emit("ice-candidate", {candidate});
+  socket.on("ice-candidate", ({ room, candidate }) => {
+    const data = rooms.get(room);
+
+    if (!data) return;
+
+    const target =
+      socket.id === data.host
+        ? data.viewer
+        : data.host;
+
+    if (target) {
+      io.to(target).emit("ice-candidate", candidate);
+    }
   });
 
-  socket.on("stop-share", ({room}) => {
-    if (validRoom(room)) socket.to(room).emit("share-stopped");
+  socket.on("stop-share", ({ room }) => {
+    const data = rooms.get(room);
+
+    if (!data) return;
+
+    io.to(room).emit("share-stopped");
   });
 
   socket.on("disconnect", () => {
     const room = socket.data.room;
-    if (!room) return;
-    const r = rooms.get(room);
-    if (!r) return;
 
-    if (socket.id === r.host) {
-      io.to(room).emit("peer-left");
+    if (!room) return;
+
+    const data = rooms.get(room);
+
+    if (!data) return;
+
+    if (socket.id === data.host) {
+      io.to(room).emit("host-disconnected");
       rooms.delete(room);
-    } else if (socket.id === r.viewer) {
-      r.viewer = null;
-      io.to(r.host).emit("peer-left");
+    } else if (socket.id === data.viewer) {
+      data.viewer = null;
+      io.to(data.host).emit("viewer-disconnected");
     }
   });
+});
+
+// Send index.html for normal website routes
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 server.listen(PORT, "0.0.0.0", () => {
