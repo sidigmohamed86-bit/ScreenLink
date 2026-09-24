@@ -198,6 +198,7 @@ socket.on("joined-room", (room) => {
 
 socket.on("peer-joined", () => {
   if (isHost) {
+    createPeer();
     message("Device connected. You can now share your screen.");
     setStatus("Connected", true);
   }
