@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ScreenLink</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div>
+        <h1>ScreenLink</h1>
+        <p>Share a screen between your devices.</p>
+      </div>
+      <span id="status" class="status">Offline</span>
+    </header>
+
+    <section class="card">
+      <h2>Connect</h2>
+      <div class="actions">
+        <button id="createBtn">Create room</button>
+        <div class="join">
+          <input id="roomInput" maxlength="6" placeholder="Room code">
+          <button id="joinBtn" class="secondary">Join</button>
+        </div>
+      </div>
+
+      <div id="roomBox" class="room hidden">
+        <span>Room code</span>
+        <strong id="roomCode">------</strong>
+        <button id="copyBtn" class="secondary small">Copy</button>
+        <button id="shareLinkBtn" class="secondary small">Copy link</button>
+      </div>
+
+      <p id="message" class="message">Create or join a room.</p>
+    </section>
+
+    <section id="hostControls" class="card hidden">
+      <h2>Share</h2>
+      <div class="actions">
+        <button id="shareBtn">Share my screen</button>
+        <button id="stopBtn" class="danger" disabled>Stop sharing</button>
+      </div>
+      <label class="check">
+        <input id="audioBox" type="checkbox">
+        Include audio when the browser offers it
+      </label>
+    </section>
+
+    <section class="card">
+      <div class="screenTitle">
+        <h2>Remote screen</h2>
+        <span id="remoteStatus">Waiting</span>
+      </div>
+      <div class="videoWrap">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <div id="placeholder">
+          <div class="icon">▣</div>
+          <b>No screen yet</b>
+          <span>Join a room and wait for the host to share.</span>
+        </div>
+      </div>
+      <button id="fullscreenBtn" class="secondary small">Fullscreen</button>
+    </section>
+
+    <section id="localSection" class="card hidden">
+      <h2>My screen</h2>
+      <video id="localVideo" autoplay muted playsinline></video>
+    </section>
+
+    <footer>WebRTC • ScreenLink</footer>
+  </main>
+  <script src="/script.js"></script>
+</body>
+</html>
