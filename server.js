@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 
 app.disable("x-powered-by");
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(__dirname));
 
 app.get("/health", (req, res) => {
   res.json({ ok: true, service: "ScreenLink" });
@@ -21,8 +21,7 @@ app.get("/health", (req, res) => {
 
 app.use((req, res) => {
   
-res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+res.sendFile(path.join(__dirname, "index.html"));
 
 function validRoom(room) {
   return typeof room === "string" && /^[A-Z0-9]{6}$/.test(room);
