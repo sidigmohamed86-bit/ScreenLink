@@ -181,7 +181,7 @@ fullscreenBtn.onclick = async () => {
 
 socket.on("connect", () => setStatus("Online", true));
 
-socket.on("room-created", ({room}) => {
+socket.on("room-created", (room) => {
   isHost = true;
   showRoom(room);
   hostControls.classList.remove("hidden");
@@ -189,7 +189,7 @@ socket.on("room-created", ({room}) => {
   message("Room created. Open this same website on the other device and join.");
 });
 
-socket.on("joined", ({room}) => {
+socket.on("joined-room", (room) => {
   isHost = false;
   showRoom(room);
   setStatus("Connecting");
