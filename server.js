@@ -19,8 +19,9 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, service: "ScreenLink" });
 });
 
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+app.use((req, res) => {
+  
+res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 function validRoom(room) {
