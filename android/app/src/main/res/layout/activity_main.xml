@@ -8,9 +8,20 @@
         android:orientation="vertical"
         android:padding="24dp">
 
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_gravity="center_horizontal"
+            android:contentDescription="ScreenLink logo"
+            android:src="@drawable/ic_screenlink_foreground"
+            android:background="@drawable/ic_screenlink_background"
+            android:padding="8dp" />
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
             android:text="ScreenLink"
             android:textSize="32sp"
             android:textStyle="bold" />
