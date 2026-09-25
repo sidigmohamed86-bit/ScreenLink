@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjection
 import android.os.Build
+import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import io.socket.client.IO
 import io.socket.client.Socket
