@@ -1,0 +1,24 @@
+name: ScreenLink Runner Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Runner diagnostics
+        run: |
+          set -eux
+          echo "Runner diagnostic started"
+          uname -a
+          echo "Runner: $RUNNER_NAME"
+          echo "OS: $RUNNER_OS"
+          echo "Architecture: $RUNNER_ARCH"
+          df -h
+          java -version || true
+          echo "Runner diagnostic completed"
