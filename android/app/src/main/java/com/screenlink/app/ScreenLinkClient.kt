@@ -85,13 +85,16 @@ object ScreenLinkClient {
 
         socket!!.on("ice-candidate") { a ->
             val j = a[0] as JSONObject
-            peer?.addIceCandidate(
-                IceCandidate(
-                    j.optString("sdpMid", null),
-                    j.optInt("sdpMLineIndex"),
-                    j.getString("candidate")
-                )
+            val c = IceCandidate(
+                j.optString("sdpMid", null),
+                j.optInt("sdpMLineIndex"),
+                j.getString("candidate")
             )
+            if (remoteDescriptionSet) {
+                peer?.addIceCandidate(c)
+            } else {
+                pendingIceCandidates.add(c)
+            }
         }
 
         socket!!.connect()
