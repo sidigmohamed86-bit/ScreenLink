@@ -91,7 +91,9 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        ScreenLinkClient.shutdown()
+        if (isFinishing && !isChangingConfigurations) {
+            ScreenLinkClient.shutdown()
+        }
         super.onDestroy()
     }
 }
