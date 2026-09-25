@@ -89,6 +89,7 @@ object ScreenLinkClient {
         socket!!.on("viewer-disconnected") {
             peer?.close()
             peer = null
+            sender = null
             remoteDescriptionSet = false
             pendingIceCandidates.clear()
             callback?.invoke("Computer disconnected", room)
@@ -356,6 +357,7 @@ object ScreenLinkClient {
 
         peer?.close()
         peer = null
+        sender = null
 
         socket?.disconnect()
         socket = null
