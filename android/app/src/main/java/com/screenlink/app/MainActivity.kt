@@ -1,6 +1,7 @@
 package com.screenlink.app
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
@@ -42,8 +43,27 @@ class MainActivity : Activity() {
         }
 
         startShare.setOnClickListener {
-            val intent = ScreenLinkClient.createCaptureIntent()
-            startActivityForResult(intent, ScreenLinkClient.CAPTURE_REQUEST)
+            if (!ScreenLinkClient.canStartSharing()) {
+                status.text = "Connect the computer first"
+                return@setOnClickListener
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("Allow screen sharing")
+                .setMessage(
+                    "ScreenLink needs your permission to capture your phone screen. " +
+                    "Android will show a system confirmation next. Your screen is not shared until you allow it."
+                )
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue") { _, _ ->
+                    status.text = "Waiting for screen-sharing permission…"
+                    val intent = ScreenLinkClient.createCaptureIntent()
+                    startActivityForResult(
+                        intent,
+                        ScreenLinkClient.CAPTURE_REQUEST
+                    )
+                }
+                .show()
         }
 
         stopShare.setOnClickListener {
@@ -59,11 +79,14 @@ class MainActivity : Activity() {
         if (requestCode != ScreenLinkClient.CAPTURE_REQUEST) return
 
         if (resultCode == RESULT_OK && data != null) {
+            status.text = "Starting screen sharing…"
             ScreenLinkClient.startSharing(resultCode, data)
             startShare.isEnabled = false
             stopShare.isEnabled = true
         } else {
             status.text = "Screen sharing permission was cancelled"
+            startShare.isEnabled = true
+            stopShare.isEnabled = false
         }
     }
 
