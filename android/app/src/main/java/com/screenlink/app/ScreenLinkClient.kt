@@ -29,6 +29,7 @@ object ScreenLinkClient {
     private var helper: SurfaceTextureHelper? = null
     private var source: VideoSource? = null
     private var track: VideoTrack? = null
+    private var sender: RtpSender? = null
     private var eglBase: EglBase? = null
     private val pendingIceCandidates = mutableListOf<IceCandidate>()
     private var remoteDescriptionSet = false
@@ -208,7 +209,11 @@ object ScreenLinkClient {
             sharing = true
 
             track = factory!!.createVideoTrack("screen", source)
-            peer!!.addTrack(track, listOf("screen"))
+            if (sender == null) {
+                sender = peer!!.addTrack(track, listOf("screen"))
+            } else {
+                sender!!.setTrack(track, true)
+            }
 
             peer!!.createOffer(object : Obs() {
                 override fun onCreateSuccess(s: SessionDescription) {
@@ -328,6 +333,8 @@ object ScreenLinkClient {
         capturer?.dispose()
         capturer = null
 
+        sender?.setTrack(null, false)
+
         track?.dispose()
         track = null
 
@@ -336,7 +343,7 @@ object ScreenLinkClient {
 
         helper?.dispose()
         helper = null
-        remoteDescriptionSet = false
+        sharing = false
         pendingIceCandidates.clear()
 
         app.stopService(
