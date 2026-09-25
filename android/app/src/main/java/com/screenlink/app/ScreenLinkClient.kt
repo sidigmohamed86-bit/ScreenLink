@@ -3,6 +3,7 @@ package com.screenlink.app
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjection
+import android.os.Build
 import android.media.projection.MediaProjectionManager
 import io.socket.client.IO
 import io.socket.client.Socket
@@ -23,6 +24,7 @@ object ScreenLinkClient {
     private var helper: SurfaceTextureHelper? = null
     private var source: VideoSource? = null
     private var track: VideoTrack? = null
+    private var eglBase: EglBase? = null
 
     fun init(context: Context, cb: (String, String?) -> Unit) {
         app = context.applicationContext
@@ -32,10 +34,10 @@ object ScreenLinkClient {
             PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions()
         )
 
-        val egl = EglBase.create()
+        eglBase = EglBase.create()
         factory = PeerConnectionFactory.builder()
-            .setVideoEncoderFactory(DefaultVideoEncoderFactory(egl.eglBaseContext, true, true))
-            .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
+            .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase!!.eglBaseContext, true, true))
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase!!.eglBaseContext))
             .createPeerConnectionFactory()
 
         socket = IO.socket(SERVER_URL)
@@ -87,7 +89,13 @@ object ScreenLinkClient {
 
     fun createCaptureIntent(): Intent {
         val m = app.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        return m.createScreenCaptureIntent()
+        return if (Build.VERSION.SDK_INT >= 34) {
+            m.createScreenCaptureIntent(
+                MediaProjectionConfig.createConfigForDefaultDisplay()
+            )
+        } else {
+            m.createScreenCaptureIntent()
+        }
     }
 
     fun startSharing(resultCode: Int, data: Intent) {
@@ -114,11 +122,9 @@ object ScreenLinkClient {
 
     private fun beginCapture(resultCode: Int, data: Intent) {
         try {
-            val egl = EglBase.create()
-
             helper = SurfaceTextureHelper.create(
                 "ScreenLink",
-                egl.eglBaseContext
+                eglBase!!.eglBaseContext
             )
 
             source = factory!!.createVideoSource(true)
@@ -139,11 +145,16 @@ object ScreenLinkClient {
             )
 
             val d = app.resources.displayMetrics
-            capturer!!.startCapture(
-                d.widthPixels,
-                d.heightPixels,
-                30
+            val scale = minOf(
+                1920f / maxOf(d.widthPixels, d.heightPixels),
+                1080f / minOf(d.widthPixels, d.heightPixels),
+                1f
             )
+            var width = (d.widthPixels * scale).toInt().coerceAtLeast(2)
+            var height = (d.heightPixels * scale).toInt().coerceAtLeast(2)
+            if (width % 2 != 0) width--
+            if (height % 2 != 0) height--
+            capturer!!.startCapture(width, height, 60)
 
             track = factory!!.createVideoTrack("screen", source)
             peer!!.addTrack(track, listOf("screen"))
@@ -277,6 +288,8 @@ object ScreenLinkClient {
 
         socket?.disconnect()
         socket = null
+        eglBase?.release()
+        eglBase = null
     }
 
     private open class Obs : SdpObserver {
