@@ -106,7 +106,7 @@ object ScreenLinkClient {
         val m = app.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         return if (Build.VERSION.SDK_INT >= 34) {
             m.createScreenCaptureIntent(
-                MediaProjectionConfig.createConfigForDefaultDisplay()
+                MediaProjectionConfig.createConfigForUserChoice()
             )
         } else {
             m.createScreenCaptureIntent()
