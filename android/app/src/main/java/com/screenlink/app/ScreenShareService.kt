@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 
@@ -44,10 +46,12 @@ class ScreenShareService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
         )
 
-        // Only allow MediaProjection to start after the foreground service
-        // is actually running with the required mediaProjection type.
-        onReady?.invoke()
-        onReady = null
+        // Give Android a moment to register the foreground-service type
+        // before WebRTC requests the MediaProjection.
+        Handler(Looper.getMainLooper()).postDelayed({
+            onReady?.invoke()
+            onReady = null
+        }, 300)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
