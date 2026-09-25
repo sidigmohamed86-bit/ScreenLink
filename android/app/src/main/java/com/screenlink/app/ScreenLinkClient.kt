@@ -94,6 +94,10 @@ object ScreenLinkClient {
         socket?.emit("create-room", JSONObject().put("room", room))
     }
 
+    fun canStartSharing(): Boolean {
+        return room != null && peer != null
+    }
+
     fun createCaptureIntent(): Intent {
         val m = app.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         return if (Build.VERSION.SDK_INT >= 34) {
@@ -112,8 +116,6 @@ object ScreenLinkClient {
         }
 
         try {
-            // Android 14+ requires the mediaProjection foreground service
-            // to be running BEFORE MediaProjection is obtained by WebRTC.
             ScreenShareService.onReady = {
                 beginCapture(resultCode, data)
             }
