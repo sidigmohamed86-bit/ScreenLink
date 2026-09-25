@@ -140,7 +140,24 @@ async function startShare() {
 
     await startHostCall();
   } catch (e) {
-    message("Screen sharing was cancelled or unavailable.");
+    console.error("Screen sharing error:", e);
+
+    const name = e && e.name ? e.name : "UnknownError";
+    const detail = e && e.message ? e.message : "No additional details.";
+
+    if (name === "NotAllowedError") {
+      message("Screen sharing was denied by Chrome or cancelled. Try again and allow screen sharing.");
+    } else if (name === "NotFoundError") {
+      message("Chrome could not find a screen source to share on this device.");
+    } else if (name === "NotReadableError") {
+      message("The selected screen could not be captured by the device or browser.");
+    } else if (name === "InvalidStateError") {
+      message("Screen sharing must be started while this page is active. Tap Share my screen again.");
+    } else if (name === "TypeError") {
+      message("This browser does not support the requested screen-sharing options.");
+    } else {
+      message("Screen sharing failed: " + name + (detail ? " — " + detail : ""));
+    }
   }
 }
 
