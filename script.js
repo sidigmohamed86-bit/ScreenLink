@@ -120,10 +120,7 @@ async function startShare() {
   if (!peer) return message("Wait for the other device to join.");
 
   try {
-    localStream = await navigator.mediaDevices.getDisplayMedia({
-      video: true,
-      audio: audioBox.checked
-    });
+    localStream = await navigator.mediaDevices.getDisplayMedia();
 
     localVideo.srcObject = localStream;
     localSection.classList.remove("hidden");
