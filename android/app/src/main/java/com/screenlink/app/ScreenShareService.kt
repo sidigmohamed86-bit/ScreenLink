@@ -8,11 +8,20 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.ResultReceiver
 import androidx.core.app.NotificationCompat
 
 class ScreenShareService : Service() {
     companion object {
-        var onReady: (() -> Unit)? = null
+        const val EXTRA_RESULT_CODE = "result_code"
+        const val EXTRA_RESULT_DATA = "result_data"
+        const val EXTRA_RESULT_RECEIVER = "result_receiver"
+
+        const val RESULT_READY = 1
+        const val RESULT_FAILED = 0
+
+        private const val CHANNEL_ID = "screenlink_share"
+        private const val NOTIFICATION_ID = 1001
     }
 
     override fun onCreate() {
@@ -21,47 +30,57 @@ class ScreenShareService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
             NotificationChannel(
-                "screenlink_share",
+                CHANNEL_ID,
                 "ScreenLink screen sharing",
                 NotificationManager.IMPORTANCE_LOW
-            )
+            ).apply {
+                description = "Shows while ScreenLink is sharing your screen"
+            }
         )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val receiver = intent?.getParcelableExtra<ResultReceiver>(EXTRA_RESULT_RECEIVER)
+
         return try {
-            val notification: Notification = NotificationCompat.Builder(
-                this,
-                "screenlink_share"
-            )
+            val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("ScreenLink")
                 .setContentText("Screen sharing is active")
-                .setSmallIcon(android.R.drawable.ic_menu_view)
+                .setSmallIcon(com.screenlink.app.R.drawable.ic_screenlink_notification)
                 .setOngoing(true)
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
                 .build()
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(
-                    1001,
+                    NOTIFICATION_ID,
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
                 )
             } else {
-                startForeground(1001, notification)
+                startForeground(NOTIFICATION_ID, notification)
             }
 
-            onReady?.invoke()
-            onReady = null
+            receiver?.send(RESULT_READY, null)
             START_NOT_STICKY
-        } catch (_: Throwable) {
-            onReady = null
+        } catch (e: Exception) {
+            val message = e.message ?: e.javaClass.simpleName
+            receiver?.send(
+                RESULT_FAILED,
+                android.os.Bundle().apply { putString("error", message) }
+            )
             stopSelf()
             START_NOT_STICKY
         }
     }
 
     override fun onDestroy() {
-        onReady = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         super.onDestroy()
     }
 
