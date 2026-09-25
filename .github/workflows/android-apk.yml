@@ -38,3 +38,5 @@ jobs:
           name: ScreenLink-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# Triggered by ScreenLink build setup.
