@@ -27,6 +27,7 @@ let peer = null;
 let localStream = null;
 let pendingCandidates = [];
 let remoteDescriptionSet = false;
+let makingOffer = false;
 
 const rtcConfig = {
   iceServers: [
@@ -109,10 +110,18 @@ async function addPendingCandidates() {
 }
 
 async function startHostCall() {
-  if (!peer || !localStream) return;
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  socket.emit("offer", { room: roomCode, offer: peer.localDescription });
+  if (!peer || !localStream || makingOffer) return;
+
+  try {
+    makingOffer = true;
+    await peer.setLocalDescription();
+    socket.emit("offer", {
+      room: roomCode,
+      offer: peer.localDescription
+    });
+  } finally {
+    makingOffer = false;
+  }
 }
 
 async function startShare() {
@@ -263,6 +272,7 @@ socket.on("answer", async (answer) => {
     await addPendingCandidates();
   } catch (e) {
     console.error("Answer error:", e);
+    message("Connection negotiation failed. Please reconnect the device.");
   }
 });
 
@@ -280,16 +290,38 @@ socket.on("ice-candidate", async (candidate) => {
 });
 
 socket.on("share-stopped", () => {
+  pendingCandidates = [];
+  remoteDescriptionSet = false;
   remoteVideo.srcObject = null;
   placeholder.classList.remove("hidden");
   remoteStatus.textContent = "Waiting";
 });
 
 socket.on("viewer-disconnected", () => {
+  pendingCandidates = [];
+  remoteDescriptionSet = false;
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
   remoteVideo.srcObject = null;
   placeholder.classList.remove("hidden");
   remoteStatus.textContent = "Device disconnected";
   setStatus("Disconnected");
+});
+
+socket.on("host-disconnected", () => {
+  pendingCandidates = [];
+  remoteDescriptionSet = false;
+  if (peer) {
+    peer.close();
+    peer = null;
+  }
+  remoteVideo.srcObject = null;
+  placeholder.classList.remove("hidden");
+  remoteStatus.textContent = "Host disconnected";
+  setStatus("Disconnected");
+  message("The host left the room.");
 });
 
 socket.on("room-error", (m) => message(m));
