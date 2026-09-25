@@ -285,14 +285,14 @@ socket.on("share-stopped", () => {
   remoteStatus.textContent = "Waiting";
 });
 
-socket.on("peer-left", () => {
+socket.on("viewer-disconnected", () => {
   remoteVideo.srcObject = null;
   placeholder.classList.remove("hidden");
   remoteStatus.textContent = "Device disconnected";
   setStatus("Disconnected");
 });
 
-socket.on("error-message", ({message: m}) => message(m));
+socket.on("room-error", (m) => message(m));
 
 const params = new URLSearchParams(location.search);
 const initialRoom = params.get("room");
