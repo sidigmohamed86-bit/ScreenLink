@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
-import org.json.JSONObject
 
 class MainActivity : Activity() {
     private lateinit var status: TextView
@@ -30,6 +29,10 @@ class MainActivity : Activity() {
                 if (code != null) {
                     roomCode.text = code
                     startShare.isEnabled = true
+                }
+                if (state == "Screen capture stopped" || state == "Sharing stopped") {
+                    startShare.isEnabled = code != null
+                    stopShare.isEnabled = false
                 }
             }
         }
