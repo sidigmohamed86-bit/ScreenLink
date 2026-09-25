@@ -27,31 +27,55 @@ object ScreenLinkClient {
     fun init(context: Context, cb: (String, String?) -> Unit) {
         app = context.applicationContext
         callback = cb
+
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(app).createInitializationOptions()
         )
+
         val egl = EglBase.create()
         factory = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(DefaultVideoEncoderFactory(egl.eglBaseContext, true, true))
             .setVideoDecoderFactory(DefaultVideoDecoderFactory(egl.eglBaseContext))
             .createPeerConnectionFactory()
+
         socket = IO.socket(SERVER_URL)
-        socket!!.on(Socket.EVENT_CONNECT) { callback?.invoke("Online", room) }
-        socket!!.on("room-created") { a -> room = a[0].toString(); callback?.invoke("Room created", room) }
-        socket!!.on("peer-joined") { createPeer(); callback?.invoke("Computer connected", room) }
+
+        socket!!.on(Socket.EVENT_CONNECT) {
+            callback?.invoke("Online", room)
+        }
+
+        socket!!.on("room-created") { a ->
+            room = a[0].toString()
+            callback?.invoke("Room created", room)
+        }
+
+        socket!!.on("peer-joined") {
+            createPeer()
+            callback?.invoke("Computer connected", room)
+        }
+
         socket!!.on("answer") { a ->
             val j = a[0] as JSONObject
             peer?.setRemoteDescription(
                 Obs(),
-                SessionDescription(SessionDescription.Type.fromCanonicalForm(j.getString("type")), j.getString("sdp"))
+                SessionDescription(
+                    SessionDescription.Type.fromCanonicalForm(j.getString("type")),
+                    j.getString("sdp")
+                )
             )
         }
+
         socket!!.on("ice-candidate") { a ->
             val j = a[0] as JSONObject
             peer?.addIceCandidate(
-                IceCandidate(j.optString("sdpMid", null), j.optInt("sdpMLineIndex"), j.getString("candidate"))
+                IceCandidate(
+                    j.optString("sdpMid", null),
+                    j.optInt("sdpMLineIndex"),
+                    j.getString("candidate")
+                )
             )
         }
+
         socket!!.connect()
     }
 
@@ -71,31 +95,78 @@ object ScreenLinkClient {
             callback?.invoke("Wait for the computer to join", room)
             return
         }
+
         try {
-            app.startForegroundService(Intent(app, ScreenShareService::class.java))
+            // Android 14+ requires the mediaProjection foreground service
+            // to be running BEFORE MediaProjection is obtained by WebRTC.
+            ScreenShareService.onReady = {
+                beginCapture(resultCode, data)
+            }
+
+            app.startForegroundService(
+                Intent(app, ScreenShareService::class.java)
+            )
+        } catch (e: Exception) {
+            ScreenShareService.onReady = null
+            callback?.invoke("Screen share failed: " + e.message, room)
+        }
+    }
+
+    private fun beginCapture(resultCode: Int, data: Intent) {
+        try {
             val egl = EglBase.create()
-            helper = SurfaceTextureHelper.create("ScreenLink", egl.eglBaseContext)
+
+            helper = SurfaceTextureHelper.create(
+                "ScreenLink",
+                egl.eglBaseContext
+            )
+
             source = factory!!.createVideoSource(true)
-            capturer = ScreenCapturerAndroid(data, object : MediaProjection.Callback() {
-                override fun onStop() {
-                    callback?.invoke("Screen capture stopped", room)
+
+            capturer = ScreenCapturerAndroid(
+                data,
+                object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        callback?.invoke("Screen capture stopped", room)
+                    }
                 }
-            })
-            capturer!!.initialize(helper, app, source!!.capturerObserver)
+            )
+
+            capturer!!.initialize(
+                helper,
+                app,
+                source!!.capturerObserver
+            )
+
             val d = app.resources.displayMetrics
-            capturer!!.startCapture(d.widthPixels, d.heightPixels, 30)
+            capturer!!.startCapture(
+                d.widthPixels,
+                d.heightPixels,
+                30
+            )
+
             track = factory!!.createVideoTrack("screen", source)
             peer!!.addTrack(track, listOf("screen"))
+
             peer!!.createOffer(object : Obs() {
                 override fun onCreateSuccess(s: SessionDescription) {
                     peer?.setLocalDescription(Obs(), s)
+
                     val offer = JSONObject()
                         .put("type", s.type.canonicalForm())
                         .put("sdp", s.description)
-                    socket?.emit("offer", JSONObject().put("room", room).put("offer", offer))
+
+                    socket?.emit(
+                        "offer",
+                        JSONObject()
+                            .put("room", room)
+                            .put("offer", offer)
+                    )
+
                     callback?.invoke("Screen sharing", room)
                 }
             }, MediaConstraints())
+
         } catch (e: Exception) {
             callback?.invoke("Screen share failed: " + e.message, room)
         }
@@ -103,51 +174,107 @@ object ScreenLinkClient {
 
     private fun createPeer() {
         if (peer != null) return
-        val config = PeerConnection.RTCConfiguration(listOf(
-            PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
-            PeerConnection.IceServer.builder("stun:stun.cloudflare.com:3478").createIceServer()
-        ))
-        peer = factory?.createPeerConnection(config, object : PeerConnection.Observer {
-            override fun onIceCandidate(c: IceCandidate) {
-                val j = JSONObject()
-                    .put("sdpMid", c.sdpMid)
-                    .put("sdpMLineIndex", c.sdpMLineIndex)
-                    .put("candidate", c.sdp)
-                socket?.emit("ice-candidate", JSONObject().put("room", room).put("candidate", j))
+
+        val config = PeerConnection.RTCConfiguration(
+            listOf(
+                PeerConnection.IceServer.builder(
+                    "stun:stun.l.google.com:19302"
+                ).createIceServer(),
+
+                PeerConnection.IceServer.builder(
+                    "stun:stun.cloudflare.com:3478"
+                ).createIceServer()
+            )
+        )
+
+        peer = factory?.createPeerConnection(
+            config,
+            object : PeerConnection.Observer {
+                override fun onIceCandidate(c: IceCandidate) {
+                    val j = JSONObject()
+                        .put("sdpMid", c.sdpMid)
+                        .put("sdpMLineIndex", c.sdpMLineIndex)
+                        .put("candidate", c.sdp)
+
+                    socket?.emit(
+                        "ice-candidate",
+                        JSONObject()
+                            .put("room", room)
+                            .put("candidate", j)
+                    )
+                }
+
+                override fun onConnectionChange(
+                    s: PeerConnection.PeerConnectionState
+                ) {
+                    callback?.invoke(s.name, room)
+                }
+
+                override fun onSignalingChange(
+                    s: PeerConnection.SignalingState
+                ) {}
+
+                override fun onIceConnectionChange(
+                    s: PeerConnection.IceConnectionState
+                ) {}
+
+                override fun onIceConnectionReceivingChange(b: Boolean) {}
+
+                override fun onIceGatheringChange(
+                    s: PeerConnection.IceGatheringState
+                ) {}
+
+                override fun onIceCandidatesRemoved(
+                    c: Array<IceCandidate>
+                ) {}
+
+                override fun onAddStream(s: MediaStream) {}
+
+                override fun onRemoveStream(s: MediaStream) {}
+
+                override fun onDataChannel(d: DataChannel) {}
+
+                override fun onRenegotiationNeeded() {}
+
+                override fun onAddTrack(
+                    r: RtpReceiver,
+                    s: Array<MediaStream>
+                ) {}
             }
-            override fun onConnectionChange(s: PeerConnection.PeerConnectionState) {
-                callback?.invoke(s.name, room)
-            }
-            override fun onSignalingChange(s: PeerConnection.SignalingState) {}
-            override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {}
-            override fun onIceConnectionReceivingChange(b: Boolean) {}
-            override fun onIceGatheringChange(s: PeerConnection.IceGatheringState) {}
-            override fun onIceCandidatesRemoved(c: Array<IceCandidate>) {}
-            override fun onAddStream(s: MediaStream) {}
-            override fun onRemoveStream(s: MediaStream) {}
-            override fun onDataChannel(d: DataChannel) {}
-            override fun onRenegotiationNeeded() {}
-            override fun onAddTrack(r: RtpReceiver, s: Array<MediaStream>) {}
-        })
+        )
     }
 
     fun stopSharing() {
-        try { capturer?.stopCapture() } catch (_: Exception) {}
+        ScreenShareService.onReady = null
+
+        try {
+            capturer?.stopCapture()
+        } catch (_: Exception) {
+        }
+
         capturer?.dispose()
         capturer = null
+
         track?.dispose()
         track = null
+
         source?.dispose()
         source = null
+
         helper?.dispose()
         helper = null
-        app.stopService(Intent(app, ScreenShareService::class.java))
+
+        app.stopService(
+            Intent(app, ScreenShareService::class.java)
+        )
     }
 
     fun shutdown() {
         stopSharing()
+
         peer?.close()
         peer = null
+
         socket?.disconnect()
         socket = null
     }
