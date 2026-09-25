@@ -28,6 +28,7 @@ let localStream = null;
 let pendingCandidates = [];
 let remoteDescriptionSet = false;
 let makingOffer = false;
+let videoSender = null;
 
 const rtcConfig = {
   iceServers: [
@@ -140,8 +141,18 @@ async function startShare() {
     const track = localStream.getVideoTracks()[0];
     if (track) track.addEventListener("ended", stopShare);
 
-    for (const track of localStream.getTracks()) {
-      peer.addTrack(track, localStream);
+    const videoTrack = localStream.getVideoTracks()[0];
+    const audioTrack = localStream.getAudioTracks()[0];
+
+    if (videoTrack) {
+      if (videoSender) await videoSender.replaceTrack(videoTrack);
+      else videoSender = peer.addTrack(videoTrack, localStream);
+    }
+
+    if (audioTrack) {
+      const audioSender = peer.getSenders().find(s => s.track && s.track.kind === "audio");
+      if (audioSender) await audioSender.replaceTrack(audioTrack);
+      else peer.addTrack(audioTrack, localStream);
     }
 
     await startHostCall();
@@ -168,6 +179,10 @@ async function startShare() {
 }
 
 function stopShare() {
+  if (videoSender) {
+    videoSender.replaceTrack(null).catch(() => {});
+  }
+
   if (localStream) {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
