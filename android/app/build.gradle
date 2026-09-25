@@ -31,5 +31,5 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
     implementation 'io.socket:socket.io-client:2.1.0'
-    implementation 'io.github.webrtc-sdk:android:150.7871.01'
+    implementation 'io.github.webrtc-sdk:android:144.7559.15'
 }
