@@ -319,6 +319,7 @@ socket.on("viewer-disconnected", () => {
     peer.close();
     peer = null;
   }
+  videoSender = null;
   remoteVideo.srcObject = null;
   placeholder.classList.remove("hidden");
   remoteStatus.textContent = "Device disconnected";
