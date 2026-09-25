@@ -30,6 +30,9 @@ object ScreenLinkClient {
     private var source: VideoSource? = null
     private var track: VideoTrack? = null
     private var eglBase: EglBase? = null
+    private val pendingIceCandidates = mutableListOf<IceCandidate>()
+    private var remoteDescriptionSet = false
+    private var sharing = false
 
     fun init(context: Context, cb: (String, String?) -> Unit) {
         app = context.applicationContext
