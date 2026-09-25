@@ -68,6 +68,12 @@ object ScreenLinkClient {
             )
         }
 
+        socket!!.on("viewer-disconnected") {
+            peer?.close()
+            peer = null
+            callback?.invoke("Computer disconnected", room)
+        }
+
         socket!!.on("ice-candidate") { a ->
             val j = a[0] as JSONObject
             peer?.addIceCandidate(
@@ -135,6 +141,7 @@ object ScreenLinkClient {
                 object : MediaProjection.Callback() {
                     override fun onStop() {
                         callback?.invoke("Screen capture stopped", room)
+                        stopSharing()
                     }
                 }
             )
@@ -258,6 +265,7 @@ object ScreenLinkClient {
 
     fun stopSharing() {
         ScreenShareService.onReady = null
+        socket?.emit("stop-share", JSONObject().put("room", room))
 
         try {
             capturer?.stopCapture()
