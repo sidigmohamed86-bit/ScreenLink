@@ -32,8 +32,6 @@ object ScreenLinkClient {
     private var eglBase: EglBase? = null
     private val pendingIceCandidates = mutableListOf<IceCandidate>()
     private var remoteDescriptionSet = false
-    private val pendingIceCandidates = mutableListOf<IceCandidate>()
-    private var remoteDescriptionSet = false
     private var sharing = false
 
     fun init(context: Context, cb: (String, String?) -> Unit) {
@@ -171,6 +169,7 @@ object ScreenLinkClient {
     }
 
     private fun beginCapture(resultCode: Int, data: Intent) {
+        if (sharing) return
         try {
             helper = SurfaceTextureHelper.create(
                 "ScreenLink",
@@ -206,6 +205,7 @@ object ScreenLinkClient {
             if (width % 2 != 0) width--
             if (height % 2 != 0) height--
             capturer!!.startCapture(width, height, 60)
+            sharing = true
 
             track = factory!!.createVideoTrack("screen", source)
             peer!!.addTrack(track, listOf("screen"))
@@ -336,6 +336,8 @@ object ScreenLinkClient {
 
         helper?.dispose()
         helper = null
+        remoteDescriptionSet = false
+        pendingIceCandidates.clear()
 
         app.stopService(
             Intent(app, ScreenShareService::class.java)
