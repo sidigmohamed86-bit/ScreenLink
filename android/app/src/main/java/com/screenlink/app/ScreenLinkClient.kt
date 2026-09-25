@@ -212,20 +212,31 @@ object ScreenLinkClient {
 
             peer!!.createOffer(object : Obs() {
                 override fun onCreateSuccess(s: SessionDescription) {
-                    peer?.setLocalDescription(Obs(), s)
+                    peer?.setLocalDescription(object : Obs() {
+                        override fun onSetSuccess() {
+                            val local = peer?.localDescription ?: return
+                            val offer = JSONObject()
+                                .put("type", local.type.canonicalForm())
+                                .put("sdp", local.description)
 
-                    val offer = JSONObject()
-                        .put("type", s.type.canonicalForm())
-                        .put("sdp", s.description)
+                            socket?.emit(
+                                "offer",
+                                JSONObject()
+                                    .put("room", room)
+                                    .put("offer", offer)
+                            )
 
-                    socket?.emit(
-                        "offer",
-                        JSONObject()
-                            .put("room", room)
-                            .put("offer", offer)
-                    )
+                            callback?.invoke("Screen sharing", room)
+                        }
 
-                    callback?.invoke("Screen sharing", room)
+                        override fun onSetFailure(error: String) {
+                            callback?.invoke("Connection setup failed: $error", room)
+                        }
+                    }, s)
+                }
+
+                override fun onCreateFailure(error: String) {
+                    callback?.invoke("Connection setup failed: $error", room)
                 }
             }, MediaConstraints())
 
