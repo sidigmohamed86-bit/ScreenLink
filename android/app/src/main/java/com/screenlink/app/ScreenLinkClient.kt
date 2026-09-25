@@ -11,7 +11,7 @@ import org.webrtc.*
 
 object ScreenLinkClient {
     const val CAPTURE_REQUEST = 7001
-    private const val SERVER_URL = "https://YOUR-RENDER-URL.onrender.com"
+    private const val SERVER_URL = "https://screenlink-kmqd.onrender.com"
 
     private lateinit var app: Context
     private var socket: Socket? = null
@@ -48,7 +48,9 @@ object ScreenLinkClient {
         }
         socket!!.on("ice-candidate") { a ->
             val j = a[0] as JSONObject
-            peer?.addIceCandidate(IceCandidate(j.optString("sdpMid", null), j.optInt("sdpMLineIndex"), j.getString("candidate")))
+            peer?.addIceCandidate(
+                IceCandidate(j.optString("sdpMid", null), j.optInt("sdpMLineIndex"), j.getString("candidate"))
+            )
         }
         socket!!.connect()
     }
@@ -66,7 +68,8 @@ object ScreenLinkClient {
 
     fun startSharing(resultCode: Int, data: Intent) {
         if (peer == null || room == null) {
-            callback?.invoke("Wait for the computer to join", room); return
+            callback?.invoke("Wait for the computer to join", room)
+            return
         }
         try {
             app.startForegroundService(Intent(app, ScreenShareService::class.java))
@@ -74,7 +77,9 @@ object ScreenLinkClient {
             helper = SurfaceTextureHelper.create("ScreenLink", egl.eglBaseContext)
             source = factory!!.createVideoSource(true)
             capturer = ScreenCapturerAndroid(data, object : MediaProjection.Callback() {
-                override fun onStop() { callback?.invoke("Screen capture stopped", room) }
+                override fun onStop() {
+                    callback?.invoke("Screen capture stopped", room)
+                }
             })
             capturer!!.initialize(helper, app, source!!.capturerObserver)
             val d = app.resources.displayMetrics
@@ -84,7 +89,9 @@ object ScreenLinkClient {
             peer!!.createOffer(object : Obs() {
                 override fun onCreateSuccess(s: SessionDescription) {
                     peer?.setLocalDescription(Obs(), s)
-                    val offer = JSONObject().put("type", s.type.canonicalForm()).put("sdp", s.description)
+                    val offer = JSONObject()
+                        .put("type", s.type.canonicalForm())
+                        .put("sdp", s.description)
                     socket?.emit("offer", JSONObject().put("room", room).put("offer", offer))
                     callback?.invoke("Screen sharing", room)
                 }
@@ -102,10 +109,15 @@ object ScreenLinkClient {
         ))
         peer = factory?.createPeerConnection(config, object : PeerConnection.Observer {
             override fun onIceCandidate(c: IceCandidate) {
-                val j = JSONObject().put("sdpMid", c.sdpMid).put("sdpMLineIndex", c.sdpMLineIndex).put("candidate", c.sdp)
+                val j = JSONObject()
+                    .put("sdpMid", c.sdpMid)
+                    .put("sdpMLineIndex", c.sdpMLineIndex)
+                    .put("candidate", c.sdp)
                 socket?.emit("ice-candidate", JSONObject().put("room", room).put("candidate", j))
             }
-            override fun onConnectionChange(s: PeerConnection.PeerConnectionState) { callback?.invoke(s.name, room) }
+            override fun onConnectionChange(s: PeerConnection.PeerConnectionState) {
+                callback?.invoke(s.name, room)
+            }
             override fun onSignalingChange(s: PeerConnection.SignalingState) {}
             override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {}
             override fun onIceConnectionReceivingChange(b: Boolean) {}
@@ -121,14 +133,24 @@ object ScreenLinkClient {
 
     fun stopSharing() {
         try { capturer?.stopCapture() } catch (_: Exception) {}
-        capturer?.dispose(); capturer = null
-        track?.dispose(); track = null
-        source?.dispose(); source = null
-        helper?.dispose(); helper = null
+        capturer?.dispose()
+        capturer = null
+        track?.dispose()
+        track = null
+        source?.dispose()
+        source = null
+        helper?.dispose()
+        helper = null
         app.stopService(Intent(app, ScreenShareService::class.java))
     }
 
-    fun shutdown() { stopSharing(); peer?.close(); peer = null; socket?.disconnect(); socket = null }
+    fun shutdown() {
+        stopSharing()
+        peer?.close()
+        peer = null
+        socket?.disconnect()
+        socket = null
+    }
 
     private open class Obs : SdpObserver {
         override fun onCreateSuccess(s: SessionDescription) {}
