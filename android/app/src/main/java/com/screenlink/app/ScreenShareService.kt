@@ -6,7 +6,9 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 
 class ScreenShareService : Service() {
     override fun onCreate() {
@@ -28,7 +30,12 @@ class ScreenShareService : Service() {
             .setOngoing(true)
             .build()
 
-        startForeground(1001, notification)
+        ServiceCompat.startForeground(
+            this,
+            1001,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
