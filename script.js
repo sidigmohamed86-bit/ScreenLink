@@ -121,7 +121,7 @@ async function startShare() {
 
   try {
     localStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { width:{ideal:1920}, height:{ideal:1080}, frameRate:{ideal:60,max:60} },
+      video: true,
       audio: audioBox.checked
     });
 
