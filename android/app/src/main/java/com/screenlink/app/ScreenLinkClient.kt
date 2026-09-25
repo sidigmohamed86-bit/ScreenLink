@@ -69,7 +69,17 @@ object ScreenLinkClient {
         socket!!.on("answer") { a ->
             val j = a[0] as JSONObject
             peer?.setRemoteDescription(
-                Obs(),
+                object : Obs() {
+                    override fun onSetSuccess() {
+                        remoteDescriptionSet = true
+                        pendingIceCandidates.forEach { peer?.addIceCandidate(it) }
+                        pendingIceCandidates.clear()
+                    }
+
+                    override fun onSetFailure(error: String) {
+                        callback?.invoke("Connection setup failed: $error", room)
+                    }
+                },
                 SessionDescription(
                     SessionDescription.Type.fromCanonicalForm(j.getString("type")),
                     j.getString("sdp")
@@ -80,6 +90,8 @@ object ScreenLinkClient {
         socket!!.on("viewer-disconnected") {
             peer?.close()
             peer = null
+            remoteDescriptionSet = false
+            pendingIceCandidates.clear()
             callback?.invoke("Computer disconnected", room)
         }
 
