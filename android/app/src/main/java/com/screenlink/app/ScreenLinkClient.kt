@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjection
 import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.ResultReceiver
 import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import io.socket.client.IO
@@ -116,16 +120,33 @@ object ScreenLinkClient {
         }
 
         try {
-            ScreenShareService.onReady = {
-                beginCapture(resultCode, data)
+            val receiver = object : ResultReceiver(Handler(Looper.getMainLooper())) {
+                override fun onReceiveResult(resultCodeFromService: Int, resultData: Bundle?) {
+                    if (resultCodeFromService == ScreenShareService.RESULT_READY) {
+                        beginCapture(resultCode, data)
+                    } else {
+                        callback?.invoke(
+                            "Screen share failed: " +
+                                (resultData?.getString("error") ?: "foreground service failed"),
+                            room
+                        )
+                    }
+                }
             }
 
-            app.startForegroundService(
-                Intent(app, ScreenShareService::class.java)
-            )
+            val serviceIntent = Intent(app, ScreenShareService::class.java).apply {
+                putExtra(ScreenShareService.EXTRA_RESULT_CODE, resultCode)
+                putExtra(ScreenShareService.EXTRA_RESULT_DATA, data)
+                putExtra(ScreenShareService.EXTRA_RESULT_RECEIVER, receiver)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                app.startForegroundService(serviceIntent)
+            } else {
+                app.startService(serviceIntent)
+            }
         } catch (e: Exception) {
-            ScreenShareService.onReady = null
-            callback?.invoke("Screen share failed: " + e.message, room)
+            callback?.invoke("Screen share failed: " + (e.message ?: e.javaClass.simpleName), room)
         }
     }
 
@@ -266,7 +287,6 @@ object ScreenLinkClient {
     }
 
     fun stopSharing() {
-        ScreenShareService.onReady = null
         socket?.emit("stop-share", JSONObject().put("room", room))
 
         try {
