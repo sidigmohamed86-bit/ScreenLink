@@ -53,8 +53,7 @@ class ScreenShareService : Service() {
             onReady?.invoke()
             onReady = null
             START_NOT_STICKY
-        } catch (e: Throwable) {
-            onReady?.invoke()
+        } catch (_: Throwable) {
             onReady = null
             stopSelf()
             START_NOT_STICKY
